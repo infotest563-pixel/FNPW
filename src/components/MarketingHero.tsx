@@ -1,0 +1,94 @@
+import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { useLocation } from "wouter";
+
+const WP_BASE = "https://dev-fnpresswire.pantheonsite.io/wp-json/wp/v2/pages";
+
+interface Props {
+  pageId?: number;
+  title?: string;
+  subtitle?: string;
+  buttonText?: string;
+  buttonLink?: string;
+}
+
+export default function MarketingHero({
+  pageId,
+  title: fallbackTitle = "Making an Impact Across the Globe",
+  subtitle: fallbackSubtitle = "We believe in the power of stories to inspire, inform, and transform.",
+}: Props) {
+  const [heading, setHeading] = useState(fallbackTitle);
+  const [description, setDescription] = useState(fallbackSubtitle);
+  const [btnText, setBtnText] = useState("Contact Us Now");
+  const [btnLink, setBtnLink] = useState("https://fnpresswire.vercel.app/contact");
+  const [btnIcon, setBtnIcon] = useState("https://dev-fnpresswire.pantheonsite.io/wp-content/uploads/2026/04/SVG-2.png");
+  const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (!pageId) return;
+    fetch(`${WP_BASE}/${pageId}?acf_format=standard&_=${Date.now()}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then((json) => {
+        const acf = json?.acf;
+        if (!acf) return;
+        if (acf.distribute_heading) setHeading(acf.distribute_heading);
+        if (acf.distribute_description) setDescription(acf.distribute_description);
+        const bt = acf["distribute button_text"] || acf.distribute_button_text || acf.marketing_button_text;
+        const bl = acf["distribute button_link"] || acf.distribute_button_link || acf.marketing_button_link;
+        const img = acf["distribute button_image"] || acf.distribute_button_image || acf.marketing_button_image;
+        if (acf.heading_marketing) setHeading(acf.heading_marketing);
+        if (acf.description_marketing) setDescription(acf.description_marketing);
+        // Contact page fields (spaces in field names)
+        if (acf["contact us_heading"]) setHeading(acf["contact us_heading"]);
+        if (acf["contact _sub_heading"]) setDescription(acf["contact _sub_heading"]);
+        if (bt) setBtnText(bt);
+        if (bl) setBtnLink(bl);
+        if (img) setBtnIcon(typeof img === "string" ? img : (img?.url || ""));
+      })
+      .catch(err => console.error("MarketingHero fetch error:", err));
+  }, [pageId]);
+
+  const handleBtnClick = (e: React.MouseEvent) => {
+    if (!btnLink || btnLink === "#") return;
+    try {
+      const url = new URL(btnLink);
+      if (url.origin === window.location.origin) {
+        e.preventDefault();
+        navigate(url.pathname);
+      }
+    } catch {
+      e.preventDefault();
+      navigate(btnLink);
+    }
+  };
+
+  return (
+    <section className="relative pt-20 pb-32 lg:pt-32 lg:pb-48 overflow-hidden bg-[#2d1ce2]">
+      <div className="absolute inset-0 z-0 opacity-80"
+        style={{ background: "radial-gradient(circle at 20% 30%, #5b45ff 0%, transparent 50%), radial-gradient(circle at 80% 70%, #8e2de2 0%, transparent 50%)" }}
+      />
+      <div className="fn-container relative z-10 text-center">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+          <h1 className="text-white font-bold mb-6 tracking-tight leading-tight" style={{ fontSize: "clamp(32px, 5vw, 60px)" }}>
+            {heading}
+          </h1>
+          <p className="text-white/80 max-w-3xl mx-auto mb-10 text-lg lg:text-xl leading-relaxed">
+            {description}
+          </p>
+          <a href={btnLink} onClick={handleBtnClick}
+            className="inline-flex items-center gap-2 px-8 py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-90"
+            style={{ background: "#fff", color: "#0030F0" }}>
+            {btnText}
+            {btnIcon && <img src={btnIcon} alt="" className="w-4 h-4 object-contain" />}
+          </a>
+        </motion.div>
+      </div>
+
+      <div className="absolute bottom-0 left-0 w-full overflow-hidden leading-none z-10">
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="relative block w-full h-[60px] lg:h-[100px]" fill="#F6F6F9">
+          <path d="M0,0 C150,90 400,0 600,60 C800,120 1050,30 1200,80 L1200,120 L0,120 Z" />
+        </svg>
+      </div>
+    </section>
+  );
+}

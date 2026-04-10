@@ -1,0 +1,157 @@
+import { useState, useEffect } from "react";
+import { Link } from "wouter";
+import logoImg from "@/assets/logo.png";
+import headerBtnIcon from "@/assets/Header_btn.png";
+
+const API = `https://dev-fnpresswire.pantheonsite.io/wp-json/wp/v2/pages/14?_=${Date.now()}`;
+const MEDIA = "https://dev-fnpresswire.pantheonsite.io/wp-json/wp/v2/media";
+
+interface NavLink { label: string; href: string; }
+
+export default function Header() {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [ready, setReady] = useState(false);
+  const [navLinks, setNavLinks] = useState<NavLink[]>([]);
+  const [signInLabel, setSignInLabel] = useState("Sign In");
+  const [signInUrl, setSignInUrl] = useState("/Contact");
+  const [ctaLabel, setCtaLabel] = useState("Get Started");
+  const [ctaUrl, setCtaUrl] = useState("#");
+  const [logo, setLogo] = useState(logoImg);
+  const [ctaIcon, setCtaIcon] = useState(headerBtnIcon);
+
+  useEffect(() => {
+    fetch(API, { cache: "no-store" })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(async data => {
+        const acf = data?.acf;
+        if (!acf) { setReady(true); return; }
+
+        // Nav links from repeater
+        if (Array.isArray(acf.menu) && acf.menu.length > 0) {
+          setNavLinks(acf.menu.map((n: any) => ({
+            label: String(n.heading || ""),
+            href: String(n.link || "#"),
+          })));
+        }
+
+        setSignInLabel(String(acf.signin_text || "Sign In"));
+        setSignInUrl(String(acf.signin_link || "/Contact"));
+        setCtaLabel(String(acf.cta_text || "Get Started"));
+        setCtaUrl(String(acf.cta_link || "#"));
+
+        // Logo — media ID
+        if (acf.logo && typeof acf.logo === "number") {
+          fetch(`${MEDIA}/${acf.logo}`)
+            .then(r => r.json())
+            .then(m => { if (m?.source_url) setLogo(m.source_url); })
+            .catch(() => {});
+        }
+
+        // CTA icon — media ID
+        if (acf.cta_button_icon && typeof acf.cta_button_icon === "number") {
+          fetch(`${MEDIA}/${acf.cta_button_icon}`)
+            .then(r => r.json())
+            .then(m => { if (m?.source_url) setCtaIcon(m.source_url); })
+            .catch(() => {});
+        }
+
+        setReady(true);
+      })
+      .catch(err => {
+        console.error("WP Header fetch failed:", err);
+        // Use fallback nav on error
+        setNavLinks([
+          { label: "Platforms", href: "#platforms" },
+          { label: "Solutions", href: "#solutions" },
+          { label: "Partners", href: "#partners" },
+          { label: "Testimonials", href: "#testimonials" },
+          { label: "Pricing", href: "#pricing" },
+        ]);
+        setReady(true);
+      });
+  }, []);
+
+  // Show fallback nav while loading
+  const displayNav = navLinks.length > 0 ? navLinks : [
+    { label: "Platforms", href: "#platforms" },
+    { label: "Solutions", href: "#solutions" },
+    { label: "Partners", href: "#partners" },
+    { label: "Testimonials", href: "#testimonials" },
+    { label: "Pricing", href: "#pricing" },
+  ];
+
+  return (
+    <header className="w-full bg-white sticky top-0 z-50 border-b border-gray-100 shadow-sm">
+      <div className="fn-container">
+        <div className="flex items-center justify-between h-16 md:h-20">
+
+          {/* Logo */}
+          <div className="flex-shrink-0">
+            <Link href="/">
+              <img src={logo} alt="FN Press Wire" className="h-8 md:h-10 w-auto object-contain cursor-pointer" />
+            </Link>
+          </div>
+
+          {/* Desktop Nav */}
+          <nav className="hidden lg:flex items-center gap-8">
+            {displayNav.map((link) => (
+              <a key={link.label} href={link.href}
+                className="text-gray-600 hover:text-[#0030F0] font-medium text-sm transition-colors">
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
+          {/* Desktop CTA */}
+          <div className="hidden lg:flex items-center gap-5">
+            <a href={signInUrl} className="text-[#0030F0] font-semibold text-sm hover:underline">
+              {signInLabel}
+            </a>
+            <a href={ctaUrl} className="fn-btn-primary px-6 py-2.5 text-sm flex items-center gap-2">
+              <img src={ctaIcon} alt="" className="w-4 h-4 object-contain" />
+              {ctaLabel}
+            </a>
+          </div>
+
+          {/* Mobile hamburger */}
+          <button
+            className="lg:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-label="Toggle menu"
+          >
+            <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              {menuOpen
+                ? <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                : <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />}
+            </svg>
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        {menuOpen && (
+          <div className="lg:hidden border-t border-gray-100 py-4 flex flex-col gap-3">
+            {displayNav.map((link) => (
+              <a key={link.label} href={link.href}
+                onClick={() => setMenuOpen(false)}
+                className="text-gray-700 font-medium text-sm px-2 py-1.5 hover:text-[#0030F0] transition-colors">
+                {link.label}
+              </a>
+            ))}
+            <div className="flex items-center gap-4 pt-2 border-t border-gray-100 mt-1">
+              <a href={signInUrl} className="text-[#0030F0] font-semibold text-sm">
+                {signInLabel}
+              </a>
+              <a href={ctaUrl} className="fn-btn-primary px-5 py-2 text-sm flex items-center gap-2">
+                <img src={ctaIcon} alt="" className="w-4 h-4 object-contain" />
+                {ctaLabel}
+              </a>
+            </div>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
